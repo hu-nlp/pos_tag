@@ -115,6 +115,16 @@ class DataUtils(object):
         return embedding
 
     @staticmethod
+    def create_int_dict(elements):
+        int_dict = {}
+
+        elements.sort()
+        for idx in range(len(elements)):
+            int_dict[elements[idx]] = idx+1
+
+        return int_dict
+
+    @staticmethod
     def extract_data(corpus):
         words = []
         tags = []
