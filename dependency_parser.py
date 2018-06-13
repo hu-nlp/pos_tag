@@ -2,14 +2,13 @@ from data_utils import DataUtils
 import numpy as np
 from keras.engine import Model
 from keras.models import Sequential, load_model
-from keras.layers import Dense, Concatenate, Reshape, Activation, Dropout, LSTM, TimeDistributed, Bidirectional, Concatenate, Embedding, Input
+from keras.layers import Dense, Concatenate, Activation, Dropout, LSTM, TimeDistributed, Bidirectional, Embedding, Input
 from keras.utils import plot_model
 
-class SupervisedLSTM(object):
+class DependencyParser(object):
     def __init__(self):
         pass
 
-    #creates test data
     def __create_xy(self, dependency_tree, embedding_file, data_size, look_back, test=False):
         sentences, words, tags = DataUtils.parse_dependency_tree(dependency_tree)
         word_vectors = DataUtils.create_onehot_vectors(words)
@@ -26,8 +25,8 @@ class SupervisedLSTM(object):
                 look_back = max(look_back, len(sentence))
 
         self.look_back = look_back
-        self.num_words = len(words)
-        self.num_tags = len(tags)
+        self.distinct_words = len(words)
+        self.distinct_tags = len(tags)
 
         word_data = []
         head_data = []
@@ -35,22 +34,26 @@ class SupervisedLSTM(object):
 
         progress = 0
         for sentence in sentences[:data_size]:
-            for idx in np.arange(0,len(sentence),look_back): #Split an word > look_back into pieces i.e. 21 word to 3 pieces
-                for jdx in range(min(len(sentence)-idx,look_back)): #0 to 9, 10 to 19, 20 to 20
-                    word_timestep = np.zeros((look_back,300))
-                    head_timestep = np.zeros((look_back,len(words)))
-                    tag_timestep = np.zeros((look_back,),dtype="int32")
+            word_timestep = np.zeros((look_back,300))
+            head_timestep = np.zeros((look_back,len(words)))
+            tag_timestep = np.zeros((look_back,),dtype="int32")
 
-                    word = sentence[idx+jdx]["word"]
-                    if word != "ROOT":
-                        word_timestep[jdx] = word_emb[word] if word in word_emb else word_emb["UNK"]
+            timestep = 0
+            for element in sentence:
+                word = element["word"]
 
-                        head = sentence[idx+jdx]["head"]
-                        head_timestep[jdx] = word_vectors[head]
+                if word != "ROOT":
+                    word_timestep[timestep%look_back] = word_emb[word] if word in word_emb else word_emb["UNK"]
 
-                        tag = sentence[idx+jdx]["tag"]
-                        tag_timestep[jdx] = tag_int[tag]
+                    head = element["head"]
+                    head_timestep[timestep%look_back] = word_vectors[head]
 
+                    tag = element["tag"]
+                    tag_timestep[timestep%look_back] = tag_int[tag]
+
+                timestep += 1
+
+                if timestep%look_back == 0 or timestep == len(sentence):
                     if len(word_data) == 0:
                         word_data = [word_timestep]
                         head_data = [head_timestep]
@@ -59,6 +62,10 @@ class SupervisedLSTM(object):
                         word_data = np.append(word_data, [word_timestep], axis=0)
                         head_data = np.append(head_data, [head_timestep], axis=0)
                         tag_data = np.append(tag_data, [tag_timestep], axis=0)
+
+                    word_timestep.fill(0)
+                    head_timestep.fill(0)
+                    tag_timestep.fill(0)
 
             DataUtils.update_message(str(progress)+"/"+str(data_size))
             progress += 1
@@ -69,19 +76,41 @@ class SupervisedLSTM(object):
 
         return word_data, head_data, tag_data
 
-    def create_xy_test(self, dependency_tree, embedding_file, data_size=1, look_back=0):
+    def create_xy_test(self, dependency_tree, embedding_file, data_size=1, look_back=0, mode="create", load=None):
         DataUtils.message("Prepearing Test Data...", new=True)
 
-        word_test, head_test, tag_test = self.__create_xy_2(dependency_tree, embedding_file, data_size, look_back, test=True)
+        if mode == "create" or mode == "save":
+            word_test, head_test, tag_test = self.__create_xy(dependency_tree, embedding_file, data_size, look_back, test=True)
+
+        if mode == "save":
+            DataUtils.save_array(DataUtils.get_filename("DP_W","TEST"+"_"+str(look_back)), word_test)
+            DataUtils.save_array(DataUtils.get_filename("DP_H","TEST"+"_"+str(look_back)), head_test)
+            DataUtils.save_array(DataUtils.get_filename("DP_T","TEST"+"_"+str(look_back)), tag_test)
+
+        if mode == "load" and load is not None:
+            word_test = DataUtils.load_array(load[0])
+            head_test = DataUtils.load_array(load[1])
+            tag_test = DataUtils.load_array(load[2])
 
         self.word_test = np.array(word_test)
         self.head_test = np.array(head_test)
         self.tag_test = np.array(tag_test)
 
-    def create_xy_train(self, dependency_tree, embedding_file, data_size=1, look_back=0):
+    def create_xy_train(self, dependency_tree, embedding_file, data_size=1, look_back=0, mode="create", load=None):
         DataUtils.message("Prepearing Training Data...", new=True)
 
-        word_train, head_train, tag_train = self.__create_xy(dependency_tree, embedding_file, data_size, look_back, test=False)
+        if mode == "create" or mode == "save":
+            word_train, head_train, tag_train = self.__create_xy(dependency_tree, embedding_file, data_size, look_back, test=False)
+
+        if mode == "save":
+            DataUtils.save_array(DataUtils.get_filename("DP_W","TRAIN"+"_"+str(look_back)), word_train)
+            DataUtils.save_array(DataUtils.get_filename("DP_H","TRAIN"+"_"+str(look_back)), head_train)
+            DataUtils.save_array(DataUtils.get_filename("DP_T","TRAIN"+"_"+str(look_back)), tag_train)
+
+        if mode == "load" and load is not None:
+            word_train = DataUtils.load_array(load[0])
+            head_train = DataUtils.load_array(load[1])
+            tag_train = DataUtils.load_array(load[2])
 
         self.word_train = np.array(word_train)
         self.head_train = np.array(head_train)
@@ -89,7 +118,13 @@ class SupervisedLSTM(object):
 
     def save(self, note=""):
         DataUtils.message("Saving Model...", new=True)
-        self.model.save(DataUtils.get_filename("SLSTM", note)+".h5")
+        directory = "weights/"
+
+        DataUtils.create_dir(directory)
+
+        file = DataUtils.get_filename("DP", note)+".h5"
+
+        self.model.save(directory+file)
 
     def load(self, file):
         DataUtils.message("Loading Model...", new=True)
@@ -97,7 +132,13 @@ class SupervisedLSTM(object):
 
     def plot(self, note=""):
         DataUtils.message("Ploting Model...", new=True)
-        plot_model(self.model, to_file=DataUtils.get_filename("SLSTM", note)+".png", show_shapes=True, show_layer_names=False)
+        directory = "plot/"
+
+        DataUtils.create_dir(directory)
+
+        file = DataUtils.get_filename("DP", note)+".png"
+
+        plot_model(self.model, to_file=directory+file, show_shapes=True, show_layer_names=False)
 
     def create(self):
         DataUtils.message("Creating The Model...", new=True)
@@ -105,13 +146,13 @@ class SupervisedLSTM(object):
         word_input = Input(shape=(self.look_back,300))
 
         tag_input = Input(shape=(self.look_back,))
-        tag_emb = Embedding(self.num_tags+1, 30, input_length=self.look_back, mask_zero=True, trainable=False)(tag_input)
+        tag_emb = Embedding(self.distinct_tags+1, 30, input_length=self.look_back, mask_zero=True, trainable=False)(tag_input)
 
         concat_emb = Concatenate()([word_input, tag_emb])
 
         bilstm = Bidirectional(LSTM(300, dropout=0.35, recurrent_dropout=0.1, return_sequences=True))(concat_emb)
-        hidden = TimeDistributed(Dense(self.num_words, activation="tanh"))(bilstm)
-        output = TimeDistributed(Dense(self.num_words, activation="softmax"))(hidden)
+        hidden = TimeDistributed(Dense(800, activation="tanh"))(bilstm)
+        output = TimeDistributed(Dense(self.distinct_words, activation="softmax"))(hidden)
 
         model = Model(inputs=[word_input, tag_input], outputs=output)
         model.compile(loss='categorical_crossentropy', optimizer="adam", metrics=['accuracy'])
@@ -138,11 +179,10 @@ if __name__ == "__main__":
     epochs = 30
     look_back = 10 #0 means the largest window
 
-    model = SupervisedLSTM()
-    model.create_xy_train(train_file, embedding_file, 0.1, look_back = look_back)
-    model.create_xy_test(train_file, embedding_file, 0.01, look_back = look_back)
+    model = DependencyParser()
+    model.create_xy_train(train_file, embedding_file, 0.9, look_back = look_back)
+    model.create_xy_test(train_file, embedding_file, 0.1, look_back = look_back)
     model.create()
-    model.summary()
     model.train(30)
 
     DataUtils.message(model.validate())

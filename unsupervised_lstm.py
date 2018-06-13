@@ -14,8 +14,7 @@ class UnsupervisedLSTM(object):
         self.x_test = np.array([])
         self.y_train = np.array([])
 
-    def create_xy_test(self, tag_file, embedding_file, data_size=1, look_back=5, suffix=None):
-        DataUtils.message("Prepearing Test Data...", new=True)
+    def __create_xy_test(self, tag_file, embedding_file, data_size=1, look_back=5, suffix=None):
         x_test = []
         y_test = []
 
@@ -58,11 +57,12 @@ class UnsupervisedLSTM(object):
             if idx%int(data_size/(10*look_back)) == 0:
                 DataUtils.update_message(str(int(idx/data_size*100)))
 
-        self.x_test = x_test
-        self.y_test = y_test
+        x_test = np.array(x_test)
+        y_test = np.array(y_test)
 
-    def create_xy_train(self, tag_file, embedding_file, data_size=1, look_back=5, threshold=0, suffix=None):
-        DataUtils.message("Prepearing Training Data...", new=True)
+        return x_test, y_test
+
+    def __create_xy_train(self, tag_file, embedding_file, data_size=1, look_back=5, threshold=0, suffix=None):
         x_train = []
         y_train = []
 
@@ -100,15 +100,57 @@ class UnsupervisedLSTM(object):
             if idx%int(data_size/(10*look_back)) == 0:
                 DataUtils.update_message(str(int(idx/data_size*100)))
 
-        self.x_train = np.array(x_train)
-        self.y_train = np.array(y_train)
+        x_train = np.array(x_train)
+        y_train = np.array(y_train)
 
-        self.INPUT_SHAPE = self.x_train.shape
-        self.OUTPUT_SHAPE = self.y_train.shape
+        return x_train, y_train
+
+    def create_xy_test(self, tag_file, embedding_file, data_size=1, look_back=5, suffix=None, mode="create", load=None):
+        DataUtils.message("Prepearing Test Data...", new=True)
+
+        if mode == "create" or mode == "save":
+            x_test, y_test = self.__create_xy_test(tag_file, embedding_file, data_size, look_back, suffix)
+
+        if mode == "save":
+            DataUtils.save_array(DataUtils.get_filename("ULSTM_X","TEST"+"_"+str(look_back)), x_test)
+            DataUtils.save_array(DataUtils.get_filename("ULSTM_Y","TEST"+"_"+str(look_back)), y_test)
+
+        if mode == "load" and load is not None:
+            x_test = DataUtils.load_array(load[0])
+            y_test = DataUtils.load_array(load[1])
+
+        self.x_test = np.array(x_test)
+        self.y_test = np.array(y_test)
+
+    def create_xy_train(self, tag_file, embedding_file, data_size=1, look_back=5, threshold=0, suffix=None, mode="create", load=None):
+        DataUtils.message("Prepearing Training Data...", new=True)
+
+        if mode == "create" or mode == "save":
+            x_train, y_train = self.__create_xy_train(tag_file, embedding_file, data_size, look_back, threshold, suffix)
+
+        if mode == "save":
+            DataUtils.save_array(DataUtils.get_filename("ULSTM_X","TRAIN"+"_"+str(look_back)), x_train)
+            DataUtils.save_array(DataUtils.get_filename("ULSTM_Y","TRAIN"+"_"+str(look_back)), y_train)
+
+        if mode == "load" and load is not None:
+            x_train = DataUtils.load_array(load[0])
+            y_train = DataUtils.load_array(load[1])
+
+        self.x_train = x_train
+        self.y_train = y_train
+
+        self.INPUT_SHAPE = x_train.shape
+        self.OUTPUT_SHAPE = y_train.shape
 
     def save(self, note=""):
         DataUtils.message("Saving Model...", new=True)
-        self.model.save(DataUtils.get_filename("ULSTM", note)+".h5")
+        directory = "weights/"
+
+        DataUtils.create_dir(directory)
+
+        file = DataUtils.get_filename("ULSTM", note)+".h5"
+
+        self.model.save(directory+file)
 
     def load(self, file):
         DataUtils.message("Loading Model...", new=True)
@@ -116,7 +158,13 @@ class UnsupervisedLSTM(object):
 
     def plot(self, note=""):
         DataUtils.message("Ploting Model...", new=True)
-        plot_model(self.model, to_file=DataUtils.get_filename("ULSTM", note)+".png", show_shapes=True, show_layer_names=False)
+        directory = "plot/"
+
+        DataUtils.create_dir(directory)
+
+        file = DataUtils.get_filename("ULSTM", note)+".png"
+
+        plot_model(self.model, to_file=directory+file, show_shapes=True, show_layer_names=False)
 
     def create(self):
         DataUtils.message("Creating The Model...", new=True)
@@ -145,14 +193,14 @@ class UnsupervisedLSTM(object):
         self.model.summary()
 
 if __name__ == "__main__":
-    test_file = "data/penn_full.txt"
-    train_file = "data/penn_full.txt"
+    test_file = "data/Brown_tagged_train.txt"
+    train_file = "data/Brown_tagged_test.txt"
     embedding_file = "embeddings/GoogleNews-vectors-negative300-SLIM.bin"
     epochs = 30
 
     model = UnsupervisedLSTM()
     model.create_xy_train(train_file, embedding_file, 1, threshold=0)
-    model.create_xy_test(test_file, embedding_file, 1,)
+    model.create_xy_test(test_file, embedding_file, 1)
     model.create()
     model.train(epochs)
 

@@ -25,6 +25,11 @@ class DataUtils(object):
             return model + " - " + note + " - " + datetime.datetime.fromtimestamp(time.time()).strftime('%d%m%Y %H%M%S')
 
     @staticmethod
+    def create_dir(directory):
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+    @staticmethod
     def load_corpus(file):
         corpus = ""
         with open(file) as text:
@@ -72,12 +77,14 @@ class DataUtils(object):
             unk = np.mean([vectors[word] for word in words], axis=0)
             vectors["UNK"] = unk
 
-        DataUtils.message('Embeddings Loaded.')
         return vectors
 
     @staticmethod
     def save_embeddings(file, vectors, type=None):
         DataUtils.message('Saving Embeddings...')
+        directory = "embeddings/"
+
+        DataUtils.create_dir(directory)
 
         if type == None:
             file_type = file.rsplit(".",1)[1] if '.' in file else None
@@ -95,10 +102,21 @@ class DataUtils(object):
         if type == "word2vec":
             pass
         elif type == "pickle":
-            with open(file,'wb') as fp:
+            with open(directory+file,'wb') as fp:
                 pickle.dump(vectors, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
-        DataUtils.message('Embeddings Saved.')
+    @staticmethod
+    def save_array(file, array):
+        DataUtils.message('Saving Array...')
+        directory = "arrays/"
+
+        DataUtils.create_dir(directory)
+
+        np.save(directory+file, array)
+
+    def load_array(file):
+        DataUtils.message('Loading Array...')
+        return np.load(file)
 
     @staticmethod
     def create_onehot_vectors(elements):

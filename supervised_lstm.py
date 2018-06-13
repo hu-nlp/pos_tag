@@ -59,28 +59,52 @@ class SupervisedLSTM(object):
 
         return x, y
 
-    def create_xy_test(self, tag_file, embedding_file, data_size=1, look_back=5, suffix=None):
+    def create_xy_test(self, tag_file, embedding_file, data_size=1, look_back=5, suffix=None, mode="create", load=None):
         DataUtils.message("Prepearing Test Data...", new=True)
 
-        x_test, y_test = self.__create_xy(tag_file, embedding_file, data_size, look_back, suffix)
+        if mode == "create" or mode == "save":
+            x_test, y_test = self.__create_xy(tag_file, embedding_file, data_size, look_back, suffix)
+
+        if mode == "save":
+            DataUtils.save_array(DataUtils.get_filename("SLSTM","X_TEST"+"_"+str(look_back)), x_test)
+            DataUtils.save_array(DataUtils.get_filename("SLSTM","Y_TEST"+"_"+str(look_back)), y_test)
+
+        if mode == "load" and load is not None:
+            x_test = DataUtils.load_array(load[0])
+            y_test = DataUtils.load_array(load[1])
 
         self.x_test = np.array(x_test)
         self.y_test = np.array(y_test)
 
-    def create_xy_train(self, tag_file, embedding_file, data_size=1, look_back=5, suffix=None):
+    def create_xy_train(self, tag_file, embedding_file, data_size=1, look_back=5, suffix=None, mode="create", load=None):
         DataUtils.message("Prepearing Training Data...", new=True)
 
-        x_train, y_train = self.__create_xy(tag_file, embedding_file, data_size, look_back, suffix)
+        if mode == "create" or mode == "save":
+            x_train, y_train = self.__create_xy(tag_file, embedding_file, data_size, look_back, suffix)
 
-        self.x_train = np.array(x_train)
-        self.y_train = np.array(y_train)
+        if mode == "save":
+            DataUtils.save_array(DataUtils.get_filename("SLSTM","X_TRAIN"+"_"+str(look_back)), x_train)
+            DataUtils.save_array(DataUtils.get_filename("SLSTM","Y_TRAIN"+"_"+str(look_back)), y_train)
+
+        if mode == "load" and load is not None:
+            x_train = DataUtils.load_array(load[0])
+            y_train = DataUtils.load_array(load[1])
+
+        self.x_train = x_train
+        self.y_train = y_train
 
         self.INPUT_SHAPE = x_train.shape
         self.OUTPUT_SHAPE = y_train.shape
 
     def save(self, note=""):
         DataUtils.message("Saving Model...", new=True)
-        self.model.save(DataUtils.get_filename("SLSTM", note)+".h5")
+        directory = "weights/"
+
+        DataUtils.create_dir(directory)
+
+        file = DataUtils.get_filename("SLSTM", note)+".h5"
+
+        self.model.save(directory+file)
 
     def load(self, file):
         DataUtils.message("Loading Model...", new=True)
@@ -88,7 +112,13 @@ class SupervisedLSTM(object):
 
     def plot(self, note=""):
         DataUtils.message("Ploting Model...", new=True)
-        plot_model(self.model, to_file=DataUtils.get_filename("SLSTM", note)+".png", show_shapes=True, show_layer_names=False)
+        directory = "plot/"
+
+        DataUtils.create_dir(directory)
+
+        file = DataUtils.get_filename("SLSTM", note)+".png"
+
+        plot_model(self.model, to_file=directory+file, show_shapes=True, show_layer_names=False)
 
     def create(self):
         DataUtils.message("Creating The Model...", new=True)
@@ -107,7 +137,7 @@ class SupervisedLSTM(object):
 
     def validate(self, batch_size=16):
         DataUtils.message("Validation...")
-        return self.model.evaluate(self.x_test, self.y_test, batch_size=16)
+        return self.model.evaluate(self.x_test, self.y_test, batch_size=batch_size)
 
     def predict(self, x):
         return self.model.predict(x)
@@ -116,15 +146,14 @@ class SupervisedLSTM(object):
         self.model.summary()
 
 if __name__ == "__main__":
-    test_file = "data/penn_full.txt"
-    train_file = "data/penn_full.txt"
+    test_file = "data/Brown_tagged_train.txt"
+    train_file = "data/Brown_tagged_test.txt"
     embedding_file = "embeddings/GoogleNews-vectors-negative300-SLIM.bin"
-    suffix = None
     epochs = 30
 
     model = SupervisedLSTM()
-    model.create_xy_train(train_file, embedding_file, 0.01, suffix=suffix)
-    model.create_xy_test(test_file, embedding_file, 0.01, suffix=suffix)
+    model.create_xy_train(train_file, embedding_file, 1)
+    model.create_xy_test(test_file, embedding_file, 1)
     model.create()
     model.train(epochs)
 
