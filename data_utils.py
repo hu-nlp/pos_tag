@@ -1,4 +1,6 @@
 from gensim.models import KeyedVectors
+from gensim.models.wrappers import FastText
+
 import re
 import numpy as np
 import os
@@ -66,6 +68,10 @@ class DataUtils(object):
             model = KeyedVectors.load_word2vec_format(file, binary=True, unicode_errors="ignore")
             words = model.index2entity
             vectors = {word : model[word] for word in words}
+        elif type == "fasttext":
+            model = FastText.load_fasttext_format(file)
+            words = [w for w in model.wv.vocab]
+            vectors = {word: model[word] for word in words}
         elif type == "pickle":
             with open(file,'rb') as fp:
                 u = pickle._Unpickler(fp)
@@ -330,6 +336,60 @@ class DataUtils(object):
                 head_index = sentences[idx][jdx]["head"]
                 word = sentences[idx][head_index]["word"]
                 sentences[idx][jdx]["head"] = word
+        words.append("ROOT")
+
+        return sentences, list(set(words)), list(set(tags))
+
+    @staticmethod
+    def parse_turkish_dependency_tree(file):
+        corpus = ""
+        with open(file) as text:
+            for line in text:
+                corpus += line.strip() + "\n"
+        corpus = corpus.strip()
+
+        data = corpus.split("\n")
+        sentence = []
+        sentences = []
+        words = []
+        tags = []
+        for x in data:
+            if len(sentence) == 0:
+                sentence.append({"index": 0, "word": "ROOT", "tag": "ROOT", "head": 0, "label": "ROOT"})
+
+            if x != "":
+                x = x.split("\t")
+                index = x[0]
+                index = re.sub('[^0-9]', '', index)
+                if x[1] != '_':
+                    words.append(x[1])
+                    tags.append(x[3])
+                y = {"index": int(index), "word": x[1], "tag": x[3], "head": int(x[6]), "label": x[7]}
+                sentence.append(y)
+            else:
+                for idx, entry in enumerate(sentence):
+                    i = idx
+                    while sentence[i]['word'] == '_':
+                        i+=1
+                    sentence[idx]['head'] =  sentence[i]['index']
+
+                mod_sentence = []
+                for entry in sentence:
+                    if entry['word'] != '_':
+                        if sentence[entry['head']]['word'] == '_':
+                            entry['head'] = sentence[entry['head']]['head']
+                        mod_sentence.append(entry)
+
+                sentences.append(mod_sentence)
+                sentence = []
+
+        for idx in range(len(sentences)):
+            for jdx in range(len(sentences[idx])):
+                head_index = sentences[idx][jdx]["head"]
+                for entry in sentences[idx]:
+                    if entry["index"] == head_index:
+                        sentences[idx][jdx]["head"] = entry["word"]
+
         words.append("ROOT")
 
         return sentences, list(set(words)), list(set(tags))
