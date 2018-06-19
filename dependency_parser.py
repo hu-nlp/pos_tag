@@ -246,10 +246,10 @@ class DependencyParser(object):
 
 
 if __name__ == "__main__":
-    train_file = "/Users/huseyinalecakir/NLP_LAB/DATA/METUSABANCI_treebank_v-1.conll"
-    embedding_file = "/Users/huseyinalecakir/NLP_LAB/DATA/cc.tr.300.bin"
-    morph_file = "/Users/huseyinalecakir/NLP_LAB/DATA/morph-vectors.p"
-    suffix_file = "/Users/huseyinalecakir/NLP_LAB/DATA/metu.tr"
+    train_file = "/home/huseyin/HeadSelection/Data/METUSABANCI_treebank_v-1.conll"
+    embedding_file = "/home/huseyin/HeadSelection/Data/cc.tr.300.bin"
+    morph_file = "/home/huseyin/HeadSelection/Data/morph-vectors.p"
+    suffix_file = "/home/huseyin/HeadSelection/Data/metu.tr"
 
     epochs = 5
     look_back = 10  # 0 means the largest window
