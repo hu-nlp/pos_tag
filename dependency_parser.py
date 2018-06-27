@@ -30,14 +30,18 @@ class BiLSTM(Layer):
         return (input_shape[0][0], input_shape[0][1], self.output_dim*2)
 
 class DependencyParser(object):
-    def __init__(self):
-        pass
+    def __init__(self, language):
+        self.language = language
 
-    def __create_xy(self, dependency_tree, embedding_file, data_size, look_back, test=False):
-        sentences, words, tags = DataUtils.parse_dependency_tree(dependency_tree)
+    def __create_xy(self, embedding_file, data_size, look_back, test=False):
+        sentences, words, tags = DataUtils.parse_dependency_tree(self.language)
         word_vectors = DataUtils.create_onehot_vectors(words)
         #word_int = DataUtils.create_int_dict(words)
-        word_emb = DataUtils.load_embeddings(embedding_file)
+        word_emb = None
+        if self.language == "turkish":
+            word_emb = DataUtils.load_embeddings(embedding_file, "fasttext")
+        else:
+            word_emb = DataUtils.load_embeddings(embedding_file)
         tag_int = DataUtils.create_int_dict(tags)
 
         data_size = int(len(sentences)*min(data_size, 1))
@@ -133,11 +137,11 @@ class DependencyParser(object):
 
         return word_data, tag_data, head
 
-    def create_xy_test(self, dependency_tree, embedding_file, data_size=1, look_back=0, mode="create", load=None):
+    def create_xy_test(self, embedding_file, data_size=1, look_back=0, mode="create", load=None):
         DataUtils.message("Prepearing Test Data...", new=True)
 
         if mode == "create" or mode == "save":
-            word_test, head_test, tag_test = self.__create_xy(dependency_tree, embedding_file, data_size, look_back, test=True)
+            word_test, head_test, tag_test = self.__create_xy(embedding_file, data_size, look_back, test=True)
 
         if mode == "save":
             DataUtils.save_array(DataUtils.get_filename("DP_W","TEST"+"_"+str(look_back)), word_test)
@@ -153,11 +157,11 @@ class DependencyParser(object):
         self.head_test = np.array(head_test)
         self.tag_test = np.array(tag_test)
 
-    def create_xy_train(self, dependency_tree, embedding_file, data_size=1, look_back=0, mode="create", load=None):
+    def create_xy_train(self, embedding_file, data_size=1, look_back=0, mode="create", load=None):
         DataUtils.message("Prepearing Training Data...", new=True)
 
         if mode == "create" or mode == "save":
-            word_train, tag_train, head_train = self.__create_xy(dependency_tree, embedding_file, data_size, look_back, test=False)
+            word_train, tag_train, head_train = self.__create_xy(embedding_file, data_size, look_back, test=False)
 
         self.word_train = word_train
         self.head_train = head_train
@@ -253,13 +257,13 @@ class DependencyParser(object):
         self.model.summary()
 
 if __name__ == "__main__":
-    train_file = "data/penn-treebank.conllx"
-    embedding_file = "embeddings/GoogleNews-vectors-negative300-SLIM.bin"
+
+    embedding_file = "GoogleNews-vectors-negative300-SLIM.bin"
     epochs = 0
     look_back = 100 #0 means the largest window
 
-    model = DependencyParser()
-    model.create_xy_train(train_file, embedding_file, 0.001, look_back = look_back)
+    model = DependencyParser("english")
+    model.create_xy_train(embedding_file, 0.001, look_back = look_back)
     model.create()
     model.summary()
     model.train(epochs)
